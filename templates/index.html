@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistemas Distribuidos - Algoritmos de Elección</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        .nodo { transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+        .mensaje-vuelo { 
+            position: absolute;
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            z-index: 100;
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-white min-h-screen font-sans">
+
+    <div class="p-6">
+        <h1 class="text-3xl font-bold text-center mb-6 text-blue-400">Simulador de Algoritmos de Elección</h1>
+        
+        <div class="flex flex-col items-center gap-6 mb-10">
+            <div class="flex bg-slate-800 p-1 rounded-lg border border-slate-600">
+                <button id="btn-bully" onclick="cambiarModo('BULLY')" class="px-6 py-2 rounded-md font-bold transition-all bg-blue-600 text-white">Algoritmo BULLY</button>
+                <button id="btn-ring" onclick="cambiarModo('RING')" class="px-6 py-2 rounded-md font-bold transition-all text-slate-400 hover:text-white">Algoritmo RING (Anillo)</button>
+            </div>
+            
+            <div class="flex gap-4">
+                <button onclick="agregarNodo()" class="bg-blue-600 hover:bg-blue-700 px-5 py-2 rounded-lg font-bold shadow-lg transition-all">Añadir Nodo</button>
+                <button onclick="iniciarEleccion()" class="bg-amber-600 hover:bg-amber-700 px-5 py-2 rounded-lg font-bold shadow-lg transition-all">Iniciar Elección</button>
+                <button onclick="resetCompleto()" class="bg-red-600 hover:bg-red-700 px-5 py-2 rounded-lg font-bold shadow-lg transition-all">Reiniciar Todo</button>
+                <button onclick="revivirNodos()" class="bg-green-600 hover:bg-green-700 px-5 py-2 rounded-lg font-bold shadow-lg transition-all">Revivir Todos</button>
+            </div>
+        </div>
+
+        <div class="relative w-full flex justify-center items-center h-[550px]">
+            <div id="red-distribuida" class="relative w-[500px] h-[500px] border-2 border-slate-800 rounded-full flex items-center justify-center">
+                </div>
+
+            <div id="leyenda" class="absolute right-10 top-0 bg-slate-800/90 p-4 rounded-xl border border-slate-600 w-56 shadow-2xl">
+                <h3 class="text-blue-400 font-bold mb-3 border-b border-slate-700 pb-1 italic">Leyenda Bully</h3>
+                <div class="space-y-4 text-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="w-4 h-4 rounded-full bg-[#f59e0b]"></div> 
+                        <span>ELECTION (Elección)</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="w-4 h-4 rounded-full bg-[#10b981]"></div> 
+                        <span>OK (Respuesta)</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="w-4 h-4 rounded-full bg-[#8b5cf6]"></div> 
+                        <span>COORDINATOR (Líder)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="consola" class="fixed bottom-0 left-0 w-full p-4 bg-black/80 h-32 overflow-y-auto border-t border-slate-700 font-mono text-xs text-green-400 shadow-2xl">
+            <p class="text-gray-500">> Sistema listo. Selecciona algoritmo y añade nodos.</p>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let nodos = [];
+        let modoActual = 'BULLY';
+
+        function cambiarModo(nuevoModo) {
+            modoActual = nuevoModo;
+            const btnB = document.getElementById('btn-bully');
+            const btnR = document.getElementById('btn-ring');
+            const leyenda = document.getElementById('leyenda');
+
+            if(modoActual === 'BULLY') {
+                btnB.className = "px-6 py-2 rounded-md font-bold bg-blue-600 text-white";
+                btnR.className = "px-6 py-2 rounded-md font-bold text-slate-400 hover:text-white";
+                leyenda.style.display = "block";
+            } else {
+                btnR.className = "px-6 py-2 rounded-md font-bold bg-purple-600 text-white";
+                btnB.className = "px-6 py-2 rounded-md font-bold text-slate-400 hover:text-white";
+                leyenda.style.display = "none";
+            }
+            socket.emit('cambiar_algoritmo', { modo: modoActual });
+            log(`Modo cambiado a: ${modoActual}`);
+        }
+
+        function agregarNodo() {
+            let id;
+            // Generar un ID aleatorio entre 1 y 99 que no exista ya
+            do {
+                id = Math.floor(Math.random() * 99) + 1;
+            } while (nodos.some(n => n.id === id));
+
+            nodos.push({ id: id, estado: 'vivo', esLider: false });
+            actualizarVista();
+            socket.emit('registrar_nodo', { id: id });
+            log(`Nodo ${id} se ha unido a la red.`);
+        }
+
+        function actualizarVista() {
+            const contenedor = document.getElementById('red-distribuida');
+            contenedor.innerHTML = '';
+            const radio = 250;
+            const centroX = 250; // Mitad de 500px
+            const centroY = 250; // Mitad de 500px
+
+            nodos.forEach((nodo, i) => {
+                const angulo = (i * 2 * Math.PI) / nodos.length;
+                const x = centroX + radio * Math.cos(angulo) - 24; 
+                const y = centroY + radio * Math.sin(angulo) - 24;
+
+                const div = document.createElement('div');
+                div.id = `nodo-${nodo.id}`;
+                const estaMuerto = nodo.estado === 'muerto';
+                const esLider = nodo.esLider && !estaMuerto;
+
+                div.className = `nodo absolute w-12 h-12 rounded-full border-4 flex items-center justify-center font-bold cursor-pointer z-10
+                    ${estaMuerto ? 'border-red-900 bg-gray-800 text-gray-600' : 
+                      esLider ? 'border-yellow-400 bg-yellow-600 shadow-[0_0_20px_rgba(250,204,21,0.6)]' : 
+                      'border-blue-500 bg-blue-900 hover:scale-110'}`;
+                
+                div.style.left = `${x}px`;
+                div.style.top = `${y}px`;
+                div.innerText = nodo.id;
+
+                div.onclick = () => {
+                    if (nodo.estado !== 'muerto') {
+                        nodo.estado = 'muerto';
+                        nodo.esLider = false;
+                        socket.emit('matar_nodo', { id: nodo.id });
+                        actualizarVista();
+                    }
+                };
+                contenedor.appendChild(div);
+            });
+        }
+
+        function iniciarEleccion() {
+            const idIniciador = prompt("¿Qué nodo detecta el fallo? (Ingresa ID):");
+            if (idIniciador && nodos.find(n => n.id == idIniciador && n.estado == 'vivo')) {
+                socket.emit('forzar_eleccion_desde', { id: parseInt(idIniciador) });
+            } else {
+                alert("ID no válido o nodo muerto.");
+            }
+        }
+
+        function revivirNodos() {
+            nodos.forEach(n => { n.estado = 'vivo'; n.esLider = false; socket.emit('registrar_nodo', {id: n.id}); });
+            actualizarVista();
+            log("Todos los nodos revividos.");
+        }
+
+        function resetCompleto() {
+            socket.emit('reset_backend');
+            nodos = [];
+            actualizarVista();
+            document.getElementById('consola').innerHTML = '<p class="text-gray-500">> Sistema reiniciado.</p>';
+        }
+
+        function log(msg) {
+            const c = document.getElementById('consola');
+            c.innerHTML += `<p>> ${msg}</p>`;
+            c.scrollTop = c.scrollHeight;
+        }
+
+        // SOCKET EVENTS
+        socket.on('log', (data) => log(data.msg));
+
+        socket.on('nuevo_lider', (data) => {
+            nodos.forEach(n => n.esLider = (n.id === data.id));
+            actualizarVista();
+        });
+
+        socket.on('animar_mensaje', (data) => {
+            const elOrigen = document.getElementById(`nodo-${data.desde}`);
+            const elDestino = document.getElementById(`nodo-${data.hasta}`);
+            
+            if (!elOrigen || !elDestino) return;
+
+            // Obtenemos la posición exacta respecto a la ventana (viewport)
+            const rectO = elOrigen.getBoundingClientRect();
+            const rectD = elDestino.getBoundingClientRect();
+
+            // Calculamos el centro exacto del círculo del nodo
+            // Sumamos window.scrollX/Y por si moviste la pantalla hacia abajo
+            const startX = rectO.left + (rectO.width / 2) + window.scrollX;
+            const startY = rectO.top + (rectO.height / 2) + window.scrollY;
+            
+            const endX = rectD.left + (rectD.width / 2) + window.scrollX;
+            const endY = rectD.top + (rectD.height / 2) + window.scrollY;
+
+            const ball = document.createElement('div');
+            ball.className = 'mensaje-vuelo';
+            
+            // Colores según el tipo
+            if (data.tipo === 'ELECTION') ball.style.background = '#f59e0b';
+            if (data.tipo === 'OK') ball.style.background = '#10b981';
+            if (data.tipo === 'COORDINATOR') ball.style.background = '#8b5cf6';
+
+            // Ajustamos la bolita para que su centro coincida con startX/Y
+            ball.style.left = `${startX - 7}px`; 
+            ball.style.top = `${startY - 7}px`;
+            
+            document.body.appendChild(ball);
+
+            // Animación corregida
+            ball.animate([
+                { 
+                    left: `${startX - 7}px`, 
+                    top: `${startY - 7}px` 
+                },
+                { 
+                    left: `${endX - 7}px`, 
+                    top: `${endY - 7}px` 
+                }
+            ], { 
+                duration: 800, 
+                easing: 'ease-in-out' 
+            }).onfinish = () => ball.remove();
+        });
+    </script>
+</body>
+</html>
