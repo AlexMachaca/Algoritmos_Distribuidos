@@ -97,17 +97,21 @@ class ProcesoRing:
 
         # ¿El token volvió al que inició la fase?
         if sucesor_id == lista_ids[0]:
+            # --- MEJORA VISUAL: Animamos el último tramo de vuelta al iniciador ---
+            tipo_msg = 'ELECTION' if fase == "RECOLECCION" else 'COORDINATOR'
+            socketio.emit('animar_mensaje', {'desde': actual_id, 'hasta': sucesor_id, 'tipo': tipo_msg})
+            socketio.sleep(0.8) # Esperamos a que la bolita llegue al iniciador
+
             if fase == "RECOLECCION":
                 nuevo_lider = max(lista_ids)
-                emit_log(f"🏁 Recolección terminada. Mayor encontrado: {nuevo_lider}. Iniciando fase de ANUNCIO.")
-                socketio.sleep(1)
-                # Iniciar Fase 2: Anuncio (Violeta) desde el mismo iniciador
+                emit_log(f"🏁 Ciclo completo. Mayor: {nuevo_lider}. Iniciando ANUNCIO.")
+                socketio.sleep(0.5)
+                # Iniciar Fase 2
                 ProcesoRing.pasar_token(sucesor_id, [sucesor_id, nuevo_lider], orden_anillo, fase="ANUNCIO")
             else:
-                # Fase de anuncio terminada
                 lider_final = lista_ids[1]
                 socketio.emit('nuevo_lider', {'id': lider_final})
-                emit_log(f"🏆 Proceso terminado. Nodo {lider_final} es el líder oficial.")
+                emit_log(f"🏆 Anuncio completado. Nodo {lider_final} es el líder.")
         else:
             # Animación y lógica según fase
             tipo_msg = 'ELECTION' if fase == "RECOLECCION" else 'COORDINATOR'

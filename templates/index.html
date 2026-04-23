@@ -41,8 +41,8 @@
                 </div>
 
             <div id="leyenda" class="absolute right-10 top-0 bg-slate-800/90 p-4 rounded-xl border border-slate-600 w-56 shadow-2xl">
-                <h3 class="text-blue-400 font-bold mb-3 border-b border-slate-700 pb-1 italic">Leyenda Bully</h3>
-                <div class="space-y-4 text-sm">
+                <h3 id="leyenda-titulo" class="text-blue-400 font-bold mb-3 border-b border-slate-700 pb-1 italic">Leyenda Bully</h3>
+                <div id="leyenda-contenido" class="space-y-4 text-sm">
                     <div class="flex items-center gap-3">
                         <div class="w-4 h-4 rounded-full bg-[#f59e0b]"></div> 
                         <span>ELECTION (Elección)</span>
@@ -73,16 +73,28 @@
             modoActual = nuevoModo;
             const btnB = document.getElementById('btn-bully');
             const btnR = document.getElementById('btn-ring');
-            const leyenda = document.getElementById('leyenda');
+            const leyendaContenido = document.getElementById('leyenda-contenido');
+            const leyendaTitulo = document.getElementById('leyenda-titulo');
 
             if(modoActual === 'BULLY') {
                 btnB.className = "px-6 py-2 rounded-md font-bold bg-blue-600 text-white";
                 btnR.className = "px-6 py-2 rounded-md font-bold text-slate-400 hover:text-white";
-                leyenda.style.display = "block";
+                
+                leyendaTitulo.innerText = "Leyenda Bully";
+                leyendaContenido.innerHTML = `
+                    <div class="flex items-center gap-3"><div class="w-4 h-4 rounded-full bg-[#f59e0b]"></div><span>ELECTION (Elección)</span></div>
+                    <div class="flex items-center gap-3"><div class="w-4 h-4 rounded-full bg-[#10b981]"></div><span>OK (Respuesta)</span></div>
+                    <div class="flex items-center gap-3"><div class="w-4 h-4 rounded-full bg-[#8b5cf6]"></div><span>COORDINATOR (Líder)</span></div>
+                `;
             } else {
                 btnR.className = "px-6 py-2 rounded-md font-bold bg-purple-600 text-white";
                 btnB.className = "px-6 py-2 rounded-md font-bold text-slate-400 hover:text-white";
-                leyenda.style.display = "none";
+                
+                leyendaTitulo.innerText = "Leyenda Anillo";
+                leyendaContenido.innerHTML = `
+                    <div class="flex items-center gap-3"><div class="w-4 h-4 rounded-full bg-[#f59e0b]"></div><span>RECOLECCIÓN (Lista IDs)</span></div>
+                    <div class="flex items-center gap-3"><div class="w-4 h-4 rounded-full bg-[#8b5cf6]"></div><span>ANUNCIO (Nuevo Líder)</span></div>
+                `;
             }
             socket.emit('cambiar_algoritmo', { modo: modoActual });
             log(`Modo cambiado a: ${modoActual}`);
