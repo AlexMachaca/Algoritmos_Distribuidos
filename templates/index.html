@@ -152,11 +152,45 @@
         }
 
         function iniciarEleccion() {
-            const idIniciador = prompt("¿Qué nodo detecta el fallo? (Ingresa ID):");
-            if (idIniciador && nodos.find(n => n.id == idIniciador && n.estado == 'vivo')) {
-                socket.emit('forzar_eleccion_desde', { id: parseInt(idIniciador) });
+            if (nodos.length === 0) {
+                alert("No hay nodos en la red.");
+                return;
+            }
+
+            if (modoActual === 'BULLY') {
+                // Algoritmo Bully: Cualquier nodo vivo inicia aleatoriamente
+                const nodosVivos = nodos.filter(n => n.estado === 'vivo');
+                
+                if (nodosVivos.length === 0) {
+                    alert("No hay nodos vivos para iniciar la elección.");
+                    return;
+                }
+
+                const nodoAleatorio = nodosVivos[Math.floor(Math.random() * nodosVivos.length)];
+                log(`🎲 [BULLY] El nodo ${nodoAleatorio.id} ha sido elegido aleatoriamente para iniciar.`);
+                socket.emit('forzar_eleccion_desde', { id: nodoAleatorio.id });
+
             } else {
-                alert("ID no válido o nodo muerto.");
+                // Algoritmo Anillo: Inicia el mayor entre los dos siguientes al nodo muerto
+                const indiceMuerto = nodos.findIndex(n => n.estado === 'muerto');
+
+                if (indiceMuerto === -1) {
+                    alert("Para el simulador de anillo, primero 'mata' un nodo para detectar el fallo.");
+                    return;
+                }
+
+                const total = nodos.length;
+                // Obtenemos los dos nodos siguientes en sentido horario
+                const nodoSig1 = nodos[(indiceMuerto + 1) % total];
+                const nodoSig2 = nodos[(indiceMuerto + 2) % total];
+
+                // Elegimos el que tenga mayor ID de entre esos dos
+                const iniciador = (nodoSig1.id > nodoSig2.id) ? nodoSig1 : nodoSig2;
+
+                log(`⭕ [RING] Detectado fallo en nodo ${nodos[indiceMuerto].id}.`);
+                log(`🔎 Comparando sucesores: ${nodoSig1.id} vs ${nodoSig2.id}. Inicia el mayor: ${iniciador.id}`);
+                
+                socket.emit('forzar_eleccion_desde', { id: iniciador.id });
             }
         }
 
