@@ -1,0 +1,8 @@
+.nodo { transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+.mensaje-vuelo { 
+    position: absolute;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    z-index: 100;
+    box-shadow: 0 0 10px rgba(255,255,255,0.5);
+}
