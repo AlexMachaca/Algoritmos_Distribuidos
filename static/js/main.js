@@ -1,6 +1,13 @@
 const socket = io();
 let nodos = [];
 let modoActual = 'BULLY';
+let duracionSimulacion = 800; // Valor por defecto en ms
+
+// Listener para el slider de velocidad
+document.getElementById('speed-slider').addEventListener('input', (e) => {
+    duracionSimulacion = parseInt(e.target.value);
+    socket.emit('actualizar_velocidad', { velocidad: duracionSimulacion });
+});
 
 function cambiarModo(nuevoModo) {
     modoActual = nuevoModo;
@@ -30,12 +37,12 @@ function cambiarModo(nuevoModo) {
         `;
     }
     socket.emit('cambiar_algoritmo', { modo: modoActual });
+    actualizarVista(); // Redibujar líneas al cambiar modo
     log(`Modo cambiado a: ${modoActual}`);
 }
 
 function agregarNodo() {
     let id;
-    // Generar un ID aleatorio entre 1 y 99 que no exista ya
     do {
         id = Math.floor(Math.random() * 99) + 1;
     } while (nodos.some(n => n.id === id));
@@ -46,18 +53,67 @@ function agregarNodo() {
     log(`Nodo ${id} se ha unido a la red.`);
 }
 
+function getCoordenadasNodo(index, total) {
+    const radio = 250;
+    const centroX = 250;
+    const centroY = 250;
+    const angulo = (index * 2 * Math.PI) / total;
+    return {
+        x: centroX + radio * Math.cos(angulo),
+        y: centroY + radio * Math.sin(angulo)
+    };
+}
+
+function dibujarConexiones() {
+    const svg = document.getElementById('svg-conexiones');
+    svg.innerHTML = ''; // Limpiar líneas anteriores
+    const total = nodos.length;
+    if (total < 2) return;
+
+    if (modoActual === 'RING') {
+        // Dibujar anillo: línea entre i e i+1
+        nodos.forEach((_, i) => {
+            const inicio = getCoordenadasNodo(i, total);
+            const fin = getCoordenadasNodo((i + 1) % total, total);
+            const linea = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            linea.setAttribute("x1", inicio.x);
+            linea.setAttribute("y1", inicio.y);
+            linea.setAttribute("x2", fin.x);
+            linea.setAttribute("y2", fin.y);
+            linea.setAttribute("stroke", "#334155"); // slate-700
+            linea.setAttribute("stroke-width", "2");
+            linea.setAttribute("stroke-dasharray", "5,5"); // Estilo discontinuo para el anillo
+            svg.appendChild(linea);
+        });
+    } else {
+        // Dibujar malla (Bully): todos con todos, pero muy tenue
+        for (let i = 0; i < total; i++) {
+            for (let j = i + 1; j < total; j++) {
+                const inicio = getCoordenadasNodo(i, total);
+                const fin = getCoordenadasNodo(j, total);
+                const linea = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                linea.setAttribute("x1", inicio.x);
+                linea.setAttribute("y1", inicio.y);
+                linea.setAttribute("x2", fin.x);
+                linea.setAttribute("y2", fin.y);
+                linea.setAttribute("stroke", "rgba(51, 65, 85, 0.3)"); 
+                linea.setAttribute("stroke-width", "1");
+                svg.appendChild(linea);
+            }
+        }
+    }
+}
+
 function actualizarVista() {
     const contenedor = document.getElementById('red-distribuida');
-    contenedor.innerHTML = '';
-    const radio = 250;
-    const centroX = 250; // Mitad de 500px
-    const centroY = 250; // Mitad de 500px
+    // Mantener solo el SVG, limpiar los nodos (divs)
+    const nodosExistentes = contenedor.querySelectorAll('.nodo');
+    nodosExistentes.forEach(n => n.remove());
+
+    dibujarConexiones();
 
     nodos.forEach((nodo, i) => {
-        const angulo = (i * 2 * Math.PI) / nodos.length;
-        const x = centroX + radio * Math.cos(angulo) - 24; 
-        const y = centroY + radio * Math.sin(angulo) - 24;
-
+        const pos = getCoordenadasNodo(i, nodos.length);
         const div = document.createElement('div');
         div.id = `nodo-${nodo.id}`;
         const estaMuerto = nodo.estado === 'muerto';
@@ -68,8 +124,8 @@ function actualizarVista() {
               esLider ? 'border-yellow-400 bg-yellow-600 shadow-[0_0_20px_rgba(250,204,21,0.6)]' : 
               'border-blue-500 bg-blue-900 hover:scale-110'}`;
         
-        div.style.left = `${x}px`;
-        div.style.top = `${y}px`;
+        div.style.left = `${pos.x - 24}px`;
+        div.style.top = `${pos.y - 24}px`;
         div.innerText = nodo.id;
 
         div.onclick = () => {
@@ -91,38 +147,26 @@ function iniciarEleccion() {
     }
 
     if (modoActual === 'BULLY') {
-        // Algoritmo Bully: Cualquier nodo vivo inicia aleatoriamente
         const nodosVivos = nodos.filter(n => n.estado === 'vivo');
-        
         if (nodosVivos.length === 0) {
-            alert("No hay nodos vivos para iniciar la elección.");
+            alert("No hay nodos vivos.");
             return;
         }
-
         const nodoAleatorio = nodosVivos[Math.floor(Math.random() * nodosVivos.length)];
-        log(`🎲 [BULLY] El nodo ${nodoAleatorio.id} ha sido elegido aleatoriamente para iniciar.`);
+        log(`🎲 [BULLY] El nodo ${nodoAleatorio.id} inicia.`);
         socket.emit('forzar_eleccion_desde', { id: nodoAleatorio.id });
 
     } else {
-        // Algoritmo Anillo: Inicia el mayor entre los dos siguientes al nodo muerto
         const indiceMuerto = nodos.findIndex(n => n.estado === 'muerto');
-
         if (indiceMuerto === -1) {
-            alert("Para el simulador de anillo, primero 'mata' un nodo para detectar el fallo.");
+            alert("Mata un nodo primero.");
             return;
         }
-
         const total = nodos.length;
-        // Obtenemos los dos nodos siguientes en sentido horario
         const nodoSig1 = nodos[(indiceMuerto + 1) % total];
         const nodoSig2 = nodos[(indiceMuerto + 2) % total];
-
-        // Elegimos el que tenga mayor ID de entre esos dos
         const iniciador = (nodoSig1.id > nodoSig2.id) ? nodoSig1 : nodoSig2;
-
-        log(`⭕ [RING] Detectado fallo en nodo ${nodos[indiceMuerto].id}.`);
-        log(`🔎 Comparando sucesores: ${nodoSig1.id} vs ${nodoSig2.id}. Inicia el mayor: ${iniciador.id}`);
-        
+        log(`⭕ [RING] Detectado fallo. Inicia: ${iniciador.id}`);
         socket.emit('forzar_eleccion_desde', { id: iniciador.id });
     }
 }
@@ -157,47 +201,32 @@ socket.on('nuevo_lider', (data) => {
 socket.on('animar_mensaje', (data) => {
     const elOrigen = document.getElementById(`nodo-${data.desde}`);
     const elDestino = document.getElementById(`nodo-${data.hasta}`);
-    
     if (!elOrigen || !elDestino) return;
 
-    // Obtenemos la posición exacta respecto a la ventana (viewport)
     const rectO = elOrigen.getBoundingClientRect();
     const rectD = elDestino.getBoundingClientRect();
 
-    // Calculamos el centro exacto del círculo del nodo
-    // Sumamos window.scrollX/Y por si moviste la pantalla hacia abajo
     const startX = rectO.left + (rectO.width / 2) + window.scrollX;
     const startY = rectO.top + (rectO.height / 2) + window.scrollY;
-    
     const endX = rectD.left + (rectD.width / 2) + window.scrollX;
     const endY = rectD.top + (rectD.height / 2) + window.scrollY;
 
     const ball = document.createElement('div');
     ball.className = 'mensaje-vuelo';
     
-    // Colores según el tipo
     if (data.tipo === 'ELECTION') ball.style.background = '#f59e0b';
     if (data.tipo === 'OK') ball.style.background = '#10b981';
     if (data.tipo === 'COORDINATOR') ball.style.background = '#8b5cf6';
 
-    // Ajustamos la bolita para que su centro coincida con startX/Y
     ball.style.left = `${startX - 7}px`; 
     ball.style.top = `${startY - 7}px`;
-    
     document.body.appendChild(ball);
 
-    // Animación corregida
     ball.animate([
-        { 
-            left: `${startX - 7}px`, 
-            top: `${startY - 7}px` 
-        },
-        { 
-            left: `${endX - 7}px`, 
-            top: `${endY - 7}px` 
-        }
+        { left: `${startX - 7}px`, top: `${startY - 7}px` },
+        { left: `${endX - 7}px`, top: `${endY - 7}px` }
     ], { 
-        duration: 800, 
+        duration: duracionSimulacion, // Sincronizado con el slider
         easing: 'ease-in-out' 
     }).onfinish = () => ball.remove();
 });

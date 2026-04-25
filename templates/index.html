@@ -19,6 +19,16 @@
                 <button id="btn-ring" onclick="cambiarModo('RING')" class="px-6 py-2 rounded-md font-bold transition-all text-slate-400 hover:text-white">Algoritmo RING (Anillo)</button>
             </div>
             
+            <div class="flex flex-col items-center gap-2">
+                <label for="speed-slider" class="text-xs font-bold text-slate-400 uppercase tracking-wider">Velocidad de Simulación</label>
+                <div class="flex items-center gap-3">
+                    <span class="text-xs text-slate-500">Rápido</span>
+                    <input type="range" id="speed-slider" min="200" max="2000" value="800" step="100" 
+                        class="w-48 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                    <span class="text-xs text-slate-500">Lento</span>
+                </div>
+            </div>
+            
             <div class="flex gap-4">
                 <button onclick="agregarNodo()" class="bg-blue-600 hover:bg-blue-700 px-5 py-2 rounded-lg font-bold shadow-lg transition-all">Añadir Nodo</button>
                 <button onclick="iniciarEleccion()" class="bg-amber-600 hover:bg-amber-700 px-5 py-2 rounded-lg font-bold shadow-lg transition-all">Iniciar Elección</button>
@@ -29,7 +39,9 @@
 
         <div class="relative w-full flex justify-center items-center h-[550px]">
             <div id="red-distribuida" class="relative w-[500px] h-[500px] border-2 border-slate-800 rounded-full flex items-center justify-center">
-                </div>
+                <!-- Capa para las líneas de conexión -->
+                <svg id="svg-conexiones" class="absolute inset-0 w-full h-full pointer-events-none" style="z-index: 0;"></svg>
+            </div>
 
             <div id="leyenda" class="absolute right-10 top-0 bg-slate-800/90 p-4 rounded-xl border border-slate-600 w-56 shadow-2xl">
                 <h3 id="leyenda-titulo" class="text-blue-400 font-bold mb-3 border-b border-slate-700 pb-1 italic">Leyenda Bully</h3>

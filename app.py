@@ -6,10 +6,11 @@ from core.ring import ProcesoRing
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# Diccionario para guardar el estado de los nodos: {id: {'id': id, 'estado': 'vivo'}}
+# Estado global del sistema
 nodos_db = {}
 lider_actual = None
 algoritmo_activo = 'BULLY'
+velocidad_ms = 800  # Velocidad por defecto sincronizada con el frontend
 
 def emit_log(msg):
     print(msg)
@@ -20,11 +21,13 @@ def update_lider(nuevo_id):
     lider_actual = nuevo_id
 
 def get_context():
+    # El contexto ahora incluye la velocidad convertida a segundos para socketio.sleep()
     return {
         'socketio': socketio,
         'nodos_db': nodos_db,
         'emit_log': emit_log,
-        'on_lider_proclamado': update_lider
+        'on_lider_proclamado': update_lider,
+        'delay': velocidad_ms / 1000.0  
     }
 
 @app.route('/')
@@ -56,13 +59,19 @@ def handle_algo_change(data):
     algoritmo_activo = data['modo']
     print(f"🔄 Algoritmo cambiado a: {algoritmo_activo}")
 
+@socketio.on('actualizar_velocidad')
+def handle_speed(data):
+    global velocidad_ms
+    velocidad_ms = int(data['velocidad'])
+    print(f"⏱️ Velocidad actualizada a: {velocidad_ms}ms")
+
 @socketio.on('forzar_eleccion_desde')
 def handle_force_from(data):
     ctx = get_context()
     if algoritmo_activo == 'BULLY':
-        ProcesoBully.iniciar_eleccion(data['id'], ctx)
+        # Ejecutamos Bully en un hilo para manejar los sleeps sin bloquear el servidor
+        socketio.start_background_task(ProcesoBully.iniciar_eleccion, data['id'], ctx)
     else:
-        # Iniciamos el proceso de anillo en un hilo separado para no bloquear el socket
         socketio.start_background_task(ProcesoRing.iniciar_eleccion, data['id'], ctx)
 
 @socketio.on('reset_backend')

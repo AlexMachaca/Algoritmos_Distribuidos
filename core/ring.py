@@ -17,6 +17,7 @@ class ProcesoRing:
         nodos_db = ctx['nodos_db']
         emit_log = ctx['emit_log']
         socketio = ctx['socketio']
+        delay = ctx['delay']
         
         idx_actual = orden_anillo.index(actual_id)
         
@@ -39,12 +40,12 @@ class ProcesoRing:
             # Animamos el último tramo de vuelta al iniciador
             tipo_msg = 'ELECTION' if fase == "RECOLECCION" else 'COORDINATOR'
             socketio.emit('animar_mensaje', {'desde': actual_id, 'hasta': sucesor_id, 'tipo': tipo_msg})
-            socketio.sleep(0.8) # Esperamos a que la bolita llegue al iniciador
+            socketio.sleep(delay) # Usar delay dinámico
 
             if fase == "RECOLECCION":
                 nuevo_lider = max(lista_ids)
                 emit_log(f"🏁 Ciclo completo. Mayor: {nuevo_lider}. Iniciando ANUNCIO.")
-                socketio.sleep(0.5)
+                socketio.sleep(delay / 2)
                 # Iniciar Fase 2
                 ProcesoRing.pasar_token(sucesor_id, [sucesor_id, nuevo_lider], orden_anillo, "ANUNCIO", ctx)
             else:
@@ -57,7 +58,7 @@ class ProcesoRing:
             # Animación y lógica según fase
             tipo_msg = 'ELECTION' if fase == "RECOLECCION" else 'COORDINATOR'
             socketio.emit('animar_mensaje', {'desde': actual_id, 'hasta': sucesor_id, 'tipo': tipo_msg})
-            socketio.sleep(0.8)
+            socketio.sleep(delay) # Usar delay dinámico
 
             if fase == "RECOLECCION":
                 lista_ids.append(sucesor_id)
